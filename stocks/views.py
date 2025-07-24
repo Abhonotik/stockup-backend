@@ -38,20 +38,23 @@ class TransactionViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+    def get_queryset(self):
+        return Transaction.objects.filter(user=self.request.user)
+
     def perform_create(self, serializer):
         stock = serializer.validated_data['stock']
         stock_symbol = stock.symbol
 
-        # ✅ Fetch live price (fallback to 0 if failed)
+        # ✅ Fetch live price (fallback to 0)
         live_price = get_live_stock_price(stock_symbol) or 0
 
-        # ✅ Save transaction with live price
-        transaction = serializer.save(price=live_price)
+        # ✅ Save transaction with user + live price
+        transaction = serializer.save(user=self.request.user, price=live_price)
 
-        # ✅ Calculate Charges
+        # ✅ Calculate charges (STT, etc.)
         calculate_charges(transaction)
 
-        # ✅ Update Portfolio
+        # ✅ Update portfolio
         update_portfolio(
             user=transaction.user,
             stock=transaction.stock,
@@ -64,6 +67,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
         if transaction.transaction_type == 'SELL':
             portfolio = Portfolio.objects.filter(user=transaction.user, stock=transaction.stock).first()
             avg_price = portfolio.average_price if portfolio else 0
+
             update_capital_gains(
                 user=transaction.user,
                 stock=transaction.stock,
@@ -72,15 +76,16 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 buy_price=avg_price,
                 sell_date=transaction.date
             )
-            
-        if transaction.transaction_type == 'SELL':
+
             process_sell_with_fifo(
-            user=transaction.user,
-            stock=transaction.stock,
-            quantity_sold=transaction.quantity,
-            sell_price=transaction.price,
-            sell_date=transaction.date
-    )
+                user=transaction.user,
+                stock=transaction.stock,
+                quantity_sold=transaction.quantity,
+                sell_price=transaction.price,
+                sell_date=transaction.date
+            )
+
+    
 
 
 class PortfolioViewSet(viewsets.ModelViewSet):
