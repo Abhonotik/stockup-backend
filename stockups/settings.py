@@ -96,3 +96,34 @@ CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if os.ge
 
 # Default auto field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+ALLOWED_HOSTS = ['stockup-backend-cjbs.onrender.com']
+
+import os
+import dj_database_url
+from decouple import config
+
+# Add Whitenoise Middleware for static files
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # <- Add this
+    ...
+]
+
+# Static files
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+DATABASES['default'] = dj_database_url.config(
+    default=config('DATABASE_URL')
+)
+
+
+import os
+import environ
+import dj_database_url
+
+env = environ.Env()
+environ.Env.read_env()  # reads from .env or Render environment
