@@ -1,1 +1,1 @@
-web: gunicorn stockups.wsgi
+web: gunicorn stockups.wsgi:application

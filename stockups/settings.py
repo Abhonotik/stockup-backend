@@ -7,8 +7,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Security
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-default-key")
-DEBUG = os.getenv("DEBUG", "True") == "True"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+DEBUG = os.getenv("DEBUG", "False") == "True"
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,stockup-backend-cjbs.onrender.com").split(",")
 
 # Installed apps
 INSTALLED_APPS = [
@@ -19,12 +19,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # your app
+    # Local apps
+    'stocks',
     'stockups',
 
-    # third-party
+    # Third-party
     'corsheaders',
 ]
+
+# Custom user model
+AUTH_USER_MODEL = 'stocks.User'
 
 # Middleware
 MIDDLEWARE = [
@@ -38,7 +42,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# URLs and WSGI
 ROOT_URLCONF = 'stockups.urls'
+WSGI_APPLICATION = 'stockups.wsgi.application'
 
 # Templates
 TEMPLATES = [
@@ -56,8 +62,6 @@ TEMPLATES = [
         },
     },
 ]
-
-WSGI_APPLICATION = 'stockups.wsgi.application'
 
 # Database
 DATABASES = {
@@ -78,16 +82,17 @@ TIME_ZONE = os.getenv('TIME_ZONE', 'Asia/Kolkata')
 USE_I18N = True
 USE_TZ = True
 
-# Static and media
+# Static files
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 
+# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # CORS
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if os.getenv("CORS_ALLOWED_ORIGINS") else []
 
 # Default auto field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
