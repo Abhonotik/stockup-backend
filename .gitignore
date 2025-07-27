@@ -1,0 +1,38 @@
+# Ignore Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ignore virtual environments
+venv/
+env/
+ENV/
+.env/
+
+# Ignore IDE/editor folders
+.vscode/
+.idea/
+
+# Ignore Django migration files (optional if you regenerate often)
+*/migrations/__pycache__/
+*/migrations/*.pyc
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore logs and database
+*.log
+*.sqlite3
+
+# Ignore compiled translation files
+*.mo
+*.pot
+
+# Ignore media/static if dynamically generated
+staticfiles/
+media/
+
+# Ignore environment variables
+.env
