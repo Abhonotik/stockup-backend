@@ -2,14 +2,9 @@ import os
 from pathlib import Path
 import dj_database_url
 from decouple import config
-import environ
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Load environment variables
-env = environ.Env()
-environ.Env.read_env()
 
 # Security
 SECRET_KEY = config("SECRET_KEY", default="unsafe-default-key")
@@ -25,6 +20,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'rest_framework',
+    'rest_framework.authtoken',
 
     # Local apps
     'stocks',
@@ -97,6 +94,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # CORS
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="").split(",")
 
+# REST Framework
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+}
 
-
+# Auto field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -13,7 +13,7 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-    def create(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         print("📩 Raw incoming data:", request.data)
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
