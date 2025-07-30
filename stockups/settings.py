@@ -97,4 +97,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # CORS
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="").split(",")
 
+
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

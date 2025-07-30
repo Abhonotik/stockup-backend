@@ -17,5 +17,5 @@ class RegisterSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        validated_data.pop('confirm_password')  # Remove confirm_password before creating user
+        validated_data.pop('confirm_password') 
         return User.objects.create_user(**validated_data)
