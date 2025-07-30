@@ -8,7 +8,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ['username', 'email', 'password', 'confirm_password']
         extra_kwargs = {
-            'password': {'write_only': True},
+            'password': {'write_only': True}
         }
 
     def validate(self, data):
@@ -17,5 +17,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        validated_data.pop('confirm_password') 
-        return User.objects.create_user(**validated_data)
+        validated_data.pop('confirm_password', None)
+        user = User.objects.create_user(**validated_data)
+        print("✅ REGISTER DATA:", validated_data)  # <-- Add this
+        return user
