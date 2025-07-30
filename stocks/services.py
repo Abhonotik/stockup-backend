@@ -21,6 +21,4 @@ def fetch_stock_info(query):
         'name': info.get('longName', query)
     }
 
-# Example:
-print(fetch_stock_info('TCS.NS'))
 
