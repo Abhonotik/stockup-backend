@@ -28,9 +28,22 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get("email")
-        password = request.data.get("password")
+        # Get values safely
+        email = request.data.get("email", "")
+        password = request.data.get("password", "")
 
+        # Make sure they're strings and strip
+        email = email.strip() if isinstance(email, str) else ""
+        password = password.strip() if isinstance(password, str) else ""
+
+        # Validate inputs
+        if not email or not password:
+            return Response(
+                {"error": "Email and password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Authenticate
         user = authenticate(request, username=email, password=password)
 
         if user is not None:
@@ -41,4 +54,7 @@ class LoginView(APIView):
                 "email": user.email
             })
         else:
-            return Response({"error": "Invalid Credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(
+                {"error": "Invalid credentials"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )

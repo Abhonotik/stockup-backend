@@ -1,11 +1,26 @@
 from django.shortcuts import render
+from decimal import Decimal
+from datetime import date
 from django.db import models
 from decimal import Decimal
-
 from rest_framework import viewsets
 from .models import Stock, Transaction, Portfolio, CapitalGains
 from .serializers import StockSerializer, TransactionSerializer, PortfolioSerializer, CapitalGainsSerializer
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from .services import get_live_stock_price
+from decimal import Decimal
+from datetime import date
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from .models import Portfolio, Transaction, Watchlist  # Make sure Watchlist exists
+from .utils import get_live_stock_price  # your live price fetcher
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import ListAPIView
+from .models import Portfolio
+from .serializers import PortfolioSummarySerializer
 
 # Stocks CRUD
 class StockViewSet(viewsets.ModelViewSet):
@@ -36,10 +51,13 @@ from .services import get_live_stock_price
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Transaction.objects.filter(user=self.request.user)
+        if self.request.user.is_authenticated:
+            return Transaction.objects.filter(user=self.request.user)
+        return Transaction.objects.none()  
+
 
     def perform_create(self, serializer):
         stock = serializer.validated_data['stock']
@@ -84,9 +102,15 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 sell_price=transaction.price,
                 sell_date=transaction.date
             )
+            
+class PortfolioSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
 
-    
-
+    def get(self, request):
+        user = request.user
+        portfolios = Portfolio.objects.filter(user=user)
+        serializer = PortfolioSummarySerializer(portfolios, many=True)
+        return Response(serializer.data)
 
 class PortfolioViewSet(viewsets.ModelViewSet):
     queryset = Portfolio.objects.all()
@@ -156,9 +180,8 @@ def update_capital_gains(user, stock, quantity_sold, sell_price, buy_price, sell
 
     capital_gains.save()
 
+
 from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from .services import get_live_stock_price
 
 @api_view(['GET'])
 def live_price(request, symbol):
@@ -167,7 +190,6 @@ def live_price(request, symbol):
         return Response({'symbol': symbol, 'current_price': price})
     else:
         return Response({'error': 'Unable to fetch price'}, status=400)
-
 
 def search_stocks(request):
     query = request.GET.get('q', '').strip()
@@ -183,33 +205,9 @@ def search_stocks(request):
     return Response(serializer.data)
 
 
-# stocks/views.py
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.generics import ListAPIView
-from .models import Portfolio
-from .serializers import PortfolioSummarySerializer
-
-class PortfolioSummaryView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        portfolios = Portfolio.objects.filter(user=request.user, quantity__gt=0)
-        serializer = PortfolioSummarySerializer(portfolios, many=True)
-        return Response(serializer.data)
-
-
-class PortfolioSummaryView(ListAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = PortfolioSummarySerializer
-
-    def get_queryset(self):
-        return Portfolio.objects.filter(user=self.request.user)
     
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 
 def process_sell_with_fifo(user, stock, quantity_sold, sell_price, sell_date):
     buys = Transaction.objects.filter(
@@ -223,7 +221,6 @@ def process_sell_with_fifo(user, stock, quantity_sold, sell_price, sell_date):
     total_gain = Decimal('0.00')
     short_term_gain = Decimal('0.00')
     long_term_gain = Decimal('0.00')
-
     for buy in buys:
         if remaining_quantity <= 0:
             break
@@ -251,3 +248,81 @@ def process_sell_with_fifo(user, stock, quantity_sold, sell_price, sell_date):
     cap.long_term_gain += long_term_gain
     cap.tax_liability = cap.short_term_gain * Decimal('0.15') + cap.long_term_gain * Decimal('0.10')
     cap.save()
+class DashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        portfolios = Portfolio.objects.filter(user=user, quantity__gt=0).select_related('stock')
+
+        net_worth = Decimal('0')
+        todays_pnl = Decimal('0')
+        alerts = []
+
+        today = date.today()
+
+        # -------------------
+        # Portfolio Calculations
+        # -------------------
+        for p in portfolios:
+            symbol = p.stock.symbol
+            latest_price = get_live_stock_price(symbol) or p.average_price
+            latest_price = Decimal(str(latest_price))  # Convert float to Decimal
+
+            total_value = p.quantity * latest_price
+            net_worth += total_value
+
+            # Today's PnL
+            todays_transactions = Transaction.objects.filter(user=user, stock=p.stock, date=today)
+            for txn in todays_transactions:
+                txn_price = Decimal(str(txn.price))
+                if txn.transaction_type == 'BUY':
+                    todays_pnl -= txn_price * txn.quantity
+                elif txn.transaction_type == 'SELL':
+                    todays_pnl += txn_price * txn.quantity
+
+            # Alerts
+            if latest_price > p.average_price * Decimal('1.05'):
+                alerts.append(f"{symbol} price up by more than 5%")
+            elif latest_price < p.average_price * Decimal('0.95'):
+                alerts.append(f"{symbol} price down by more than 5%")
+
+        alerts = list(dict.fromkeys(alerts))[:5]  # Remove duplicates, max 5
+
+        # -------------------
+        # Watchlist
+        # -------------------
+        watchlist_items = []
+        watchlist_qs = Watchlist.objects.filter(user=user).select_related('stock')
+
+        for w in watchlist_qs:
+            symbol = w.stock.symbol
+            latest_price = get_live_stock_price(symbol) or w.stock.current_price or Decimal('0')
+            latest_price = Decimal(str(latest_price))
+            prev_price = w.stock.current_price or latest_price
+            prev_price = Decimal(str(prev_price))
+
+            change = ((latest_price - prev_price) / prev_price * 100) if prev_price != 0 else Decimal('0')
+
+            watchlist_items.append({
+                "name": w.stock.name,
+                "ticker": symbol,
+                "price": float(latest_price),
+                "change": float(change),
+            })
+
+        # -------------------
+        # Response Data
+        # -------------------
+        data = {
+            "username": user.get_username() or "User",
+            "net_worth": float(net_worth),
+            "equity": float(net_worth),
+            "sip": 0,
+            "mtf": 0,
+            "todays_pnl": float(todays_pnl),
+            "alerts": alerts or ["No alerts for today!"],
+            "watchlist": watchlist_items
+        }
+
+        return Response(data)

@@ -24,23 +24,33 @@ class CustomUserManager(BaseUserManager):
 # Custom User Model
 class User(AbstractUser):
     email = models.EmailField(unique=True)
-    username = models.CharField(max_length=150) 
+    username = None
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username'] 
-
+    REQUIRED_FIELDS = [] 
     objects = CustomUserManager()
-     
-    def __str__(self):
-        return self.username
 
+    def __str__(self):
+        return self.email
 
 class Stock(models.Model):
+    EXCHANGE_CHOICES = [
+        ('NSE', 'NSE'),
+        ('BSE', 'BSE'),
+    ]
+
     symbol = models.CharField(max_length=10, unique=True)
     name = models.CharField(max_length=255)
+    exchange = models.CharField(max_length=3, choices=EXCHANGE_CHOICES, default='NSE')
     current_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.symbol} - {self.name}"
+        return f"{self.symbol} - {self.name} ({self.exchange})"
+
+    @property
+    def last_price(self):
+        # Get the latest transaction price for this stock
+        last_txn = self.transactions.order_by('-date').first()
+        return last_txn.price if last_txn else self.current_price or 0
 
 
 class Transaction(models.Model):
@@ -55,7 +65,6 @@ class Transaction(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
     stock = models.ForeignKey(Stock, on_delete=models.CASCADE, related_name='transactions')
-
     brokerage = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stt = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     gst = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -78,7 +87,9 @@ class Portfolio(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.stock.symbol}"
+        user_display = self.user.email if self.user else "No User"
+        return f"{user_display} - {self.stock.symbol}"
+
 
 
 class CapitalGains(models.Model):
@@ -91,3 +102,15 @@ class CapitalGains(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.stock.symbol}"
+
+
+class Watchlist(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='watchlist')
+    stock = models.ForeignKey(Stock, on_delete=models.CASCADE, related_name='watchlist_items')
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{getattr(self.user, 'email', 'Unknown')} - {self.stock.symbol}"
+
+    
+  
